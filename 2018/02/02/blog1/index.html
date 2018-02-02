@@ -10,7 +10,7 @@
     <link rel="icon" href="/images/favicon.ico">
   
     
-  <title>First Blog | Xiaoru&#39;s Blog</title>
+  <title>小米路由器1/2/3环境科学上网配置方法 | Xiaoru&#39;s Blog</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.20/jquery.fancybox.min.css" />
@@ -56,14 +56,58 @@
   <div class="content">
     <article>
         <section class="content markdown-body">
-          <h1>First Blog</h1>
+          <h1>小米路由器1/2/3环境科学上网配置方法</h1>
           <div class='post-meta'>
-            <i class="fa fa-calendar" aria-hidden="true"></i> <time>2018年01月31日</time>
+            <i class="fa fa-calendar" aria-hidden="true"></i> <time>2018年02月02日</time>
             
+              | <i class="fa fa-folder-open-o" aria-hidden="true"></i> 
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/计算机/">计算机</a>
+  </div>
+
+
+
+            
+            
+              | 
+                  <i class="fa fa-tags" aria-hidden="true"></i>
+                
+               
+  <a href="/tags/#路由器" class='tag'>路由器</a>
+
+  <a href="/tags/#科学上网" class='tag'>科学上网</a>
+
+
             
           </div>
-          <h3 id="Dresden-Germany"><a href="#Dresden-Germany" class="headerlink" title="Dresden.Germany"></a>Dresden.Germany</h3><p><img src="/images/Dresden-German.jpg" alt=""><br>测试用。<br><!--<img src="/2018/01/31/d/SJT.jpg" title="[Dresden-German]">–&gt;</p>
---></p>
+          <blockquote><p>插件名称: Misstar Tools<br>路由器支持: 小米路由器硬盘版1/2（R1D&amp;R2D），小米路由器3（R3）<br>类型: ROOT SSH<br>开发: Starry</p>
+</blockquote>
+<h3 id="必备工具"><a href="#必备工具" class="headerlink" title="必备工具"></a>必备工具</h3><ul>
+<li>小米路由器开发版(建议手动安装较低版本2.11.20,<a href="http://pan.baidu.com/s/1cmP6VW" target="_blank" rel="noopener">下载地址</a>)</li>
+<li>SSH功能(具体步骤请戳<a href="http://www.right.com.cn/forum/thread-185451-1-1.html" target="_blank" rel="noopener">这里</a>开启ssh)</li>
+</ul>
+<h3 id="步骤"><a href="#步骤" class="headerlink" title="步骤"></a>步骤</h3><ol>
+<li><p>开启SSH后在SSH界面使用wget方法安装工具箱一键包:</p>
+<pre><code class="bash">$ wget http://www.misstar.com/tools/appstore/install.sh -O /tmp/install.sh &amp;&amp; chmod +x /tmp/install.sh &amp;&amp; /tmp/install.sh
+</code></pre>
+</li>
+<li><p>安装成功后进入路由器后台管理界面(miwifi.com), 进入“MT工具箱”中的“插件管理”:</p>
+<img src="/2018/02/02/blog1/blog1-1.png" title="[blog1-img1]">  
+</li>
+<li><p>由于某些不可描述的原因，插件列表里并没有「科学上网(ss)」，但是仍可在插件中心里找任意一个插件(以webshell为例):</p>
+<img src="/2018/02/02/blog1/blog1-2.png" title="[blog1-img2]">
+</li>
+<li><p>以查看网页源代码的方法找到「安装」按钮代码的id(<strong>右键-Inspect</strong>):</p>
+<img src="/2018/02/02/blog1/blog1-3.png" title="[blog1-img3]">
+</li>
+<li><p>把此id改为<strong>“ss”</strong>:</p>
+<img src="/2018/02/02/blog1/blog1-4.png" title="[blog1-img4]">
+</li>
+</ol>
+<p>6.点击「安装」按钮进行安装,成功后打开「科学上网」，添加节点输入配置信息，选择<strong>游戏模式(gamemode)</strong>即可实现自动代理上网:<br><img src="/2018/02/02/blog1/blog1-5.png" title="[blog1-img5]"></p>
+<p><strong><em>正文结束，如需转载，请标明出处！</em></strong></p>
+<h3 id="参考文献"><a href="#参考文献" class="headerlink" title="参考文献"></a>参考文献</h3><p><a href="http://www.gaoteshu.com/2017/03/10/16.html" target="_blank" rel="noopener">http://www.gaoteshu.com/2017/03/10/16.html</a></p>
+
         </section>
     </article>
     
@@ -88,7 +132,7 @@
     <div class="toc-container">
         <h1>目录</h1>
         <div class="content">
-            <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#Dresden-Germany"><span class="toc-number">1.</span> <span class="toc-text">Dresden.Germany</span></a></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#必备工具"><span class="toc-number">1.</span> <span class="toc-text">必备工具</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#步骤"><span class="toc-number">2.</span> <span class="toc-text">步骤</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参考文献"><span class="toc-number">3.</span> <span class="toc-text">参考文献</span></a></li></ol>
         </div>
     </div>
     
@@ -99,8 +143,8 @@
 <script type="text/javascript">
   /* * * CONFIGURATION VARIABLES * * */
   var disqus_shortname = "your_disqus_shortname";
-  var disqus_identifier = "http://xrzhu.com/2018/01/31/d/";
-  var disqus_url = "http://xrzhu.com/2018/01/31/d/";
+  var disqus_identifier = "http://xrzhu.com/2018/02/02/blog1/";
+  var disqus_url = "http://xrzhu.com/2018/02/02/blog1/";
 
   isAgent(getDisqus)
 
