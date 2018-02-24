@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="description" content="=_=">
+  <meta name="keywords" content="">
+  
+    <link rel="icon" href="/images/favicon.ico">
+  
+    
+  <title>Linux内核源码分析之do_fork()函数的执行过程 | Xiaoru&#39;s Website</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.20/jquery.fancybox.min.css" />
+</head>
+
+<body>
+  <header>
+  <div class="header-container">
+    <a class='logo' href="/">
+      <span>Xiaoru's Website</span>
+    </a>
+    <ul class="right-header">
+      
+        <li class="nav-item">
+          
+            <a href="/" class="item-link">Home</a>
+          
+        </li>
+      
+        <li class="nav-item">
+          
+            <a href="/movies" class="item-link">Movies</a>
+          
+        </li>
+      
+        <li class="nav-item">
+          
+            <a href="/archives" class="item-link">Archives</a>
+          
+        </li>
+      
+        <li class="nav-item">
+          
+            <a href="/tags" class="item-link">Tags</a>
+          
+        </li>
+      
+        <li class="nav-item">
+          
+            <a href="/about" class="item-link">About</a>
+          
+        </li>
+      
+    </ul>
+  </div>
+</header>
+
+  <main id='post'>
+  <div class="content">
+    <article>
+        <section class="content markdown-body">
+          <h1>Linux内核源码分析之do_fork()函数的执行过程</h1>
+          <div class='post-meta'>
+            <i class="fa fa-calendar" aria-hidden="true"></i> <time>2018年02月23日</time>
+            
+              | <i class="fa fa-folder-open-o" aria-hidden="true"></i> 
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Computer-Science/">Computer Science</a>
+  </div>
+
+
+
+            
+            
+              | 
+                  <i class="fa fa-tags" aria-hidden="true"></i>
+                
+               
+  <a href="/tags/#Operating System" class='tag'>Operating System</a>
+
+  <a href="/tags/#Linux" class='tag'>Linux</a>
+
+
+            
+          </div>
+          <script src="/assets/js/APlayer.min.js"> </script><h3 id="Linux内核版本"><a href="#Linux内核版本" class="headerlink" title="Linux内核版本"></a>Linux内核版本</h3><blockquote><p>2.6.11</p>
+</blockquote>
+<h3 id="do-fork函数概括"><a href="#do-fork函数概括" class="headerlink" title="do_fork函数概括"></a>do_fork函数概括</h3><blockquote><ul>
+<li>建立进程控制结构并赋初值，使其成为进程映像。</li>
+<li>为新进程的执行设置跟踪进程执行情况的相关内核数据结构。包括 任务数组、自由时间列表 tarray_freelist 以及 pidhash[] 数组。</li>
+<li>启动调度程序，使子进程获得运行的机会。</li>
+</ul>
+</blockquote>
+<h3 id="执行过程"><a href="#执行过程" class="headerlink" title="执行过程"></a>执行过程</h3><ul>
+<li>首先分析该函数的参数：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">long</span> <span class="title">do_fork</span><span class="params">(<span class="keyword">unsigned</span> <span class="keyword">long</span> clone_flags,</span></span></span><br><span class="line"><span class="function"><span class="params">	      <span class="keyword">unsigned</span> <span class="keyword">long</span> stack_start,</span></span></span><br><span class="line"><span class="function"><span class="params">	      struct pt_regs *regs,</span></span></span><br><span class="line"><span class="function"><span class="params">	      <span class="keyword">unsigned</span> <span class="keyword">long</span> stack_size,</span></span></span><br><span class="line"><span class="function"><span class="params">	      <span class="keyword">int</span> __user *parent_tidptr,</span></span></span><br><span class="line"><span class="function"><span class="params">	      <span class="keyword">int</span> __user *child_tidptr)</span></span></span><br></pre></td></tr></table></figure>
+<p><strong><em>注：[clone_flags : 宏定义clone标志，例如CLONE_VM表示与父进程共享内存描述符（线程的创建）<br>stack_start : 将用户态栈指针值给子进程的esp寄存器（给子进程分配新堆栈）<br>regs : 通用寄存器的地址（用户态-&gt;内核态，寄存器的值保存至内核栈中）<br>stack_size : 置0<br>parent_tidptr : 父进程用户态变量地址<br>child_tidptr : 新进程用户态变量地址]</em></strong>  </p>
+<ul>
+<li>通过查找pidmap_array位图，给子进程分配新的id号(由于PID数量有限，内核必须管理位图来表示PID空闲或者已分配):</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">long</span> pid = alloc_pidmap();</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果父进程正在被跟踪(即current-&gt;ptrace不为0时)，检查debugger程序是否想跟踪子进程，并且子进程不是内核进程(CLONE_UNTRACED未设置)那么就设置CLONE_PTRACE标志，即子进程也被跟踪：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (unlikely(current-&gt;ptrace<span class="comment">/*无符号整数*/</span>)) &#123;</span><br><span class="line">		trace = fork_traceflag (clone_flags);</span><br><span class="line">		<span class="keyword">if</span> (trace)</span><br><span class="line">			clone_flags |= CLONE_PTRACE;</span><br><span class="line">	&#125;</span><br><span class="line"><span class="comment">//fork_traceflag 函数：</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">fork_traceflag</span> <span class="params">(<span class="keyword">unsigned</span> clone_flags)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">if</span> (clone_flags &amp; CLONE_UNTRACED)</span><br><span class="line">		<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">	<span class="keyword">else</span> <span class="keyword">if</span> (clone_flags &amp; CLONE_VFORK) &#123;</span><br><span class="line">		<span class="keyword">if</span> (current-&gt;ptrace &amp; PT_TRACE_VFORK)</span><br><span class="line">			<span class="keyword">return</span> PTRACE_EVENT_VFORK;</span><br><span class="line">	&#125; <span class="keyword">else</span> <span class="keyword">if</span> ((clone_flags &amp; CSIGNAL) != SIGCHLD) &#123;</span><br><span class="line">		<span class="keyword">if</span> (current-&gt;ptrace &amp; PT_TRACE_CLONE)</span><br><span class="line">			<span class="keyword">return</span> PTRACE_EVENT_CLONE;</span><br><span class="line">	&#125; <span class="keyword">else</span> <span class="keyword">if</span> (current-&gt;ptrace &amp; PT_TRACE_FORK)</span><br><span class="line">		<span class="keyword">return</span> PTRACE_EVENT_FORK;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>调用copy_process函数复制进程描述符，如果所有必须的资源都是可用的，该函数返回刚创建的task_struct描述符的地址：（以下是函数大概的执行过程）  </li>
+</ul>
+<blockquote>
+<ul>
+<li><p>copy_process函数先检查检查clone_flags所传标志的一致性，如果不符合要求则会直接返回错误代码，创建失败。符合要求则调用dup_task_struct()为子进程创建内核栈、thread_info和进程描述符（此时父子进程描述符完全一致，方式为写时拷贝）。  </p>
+</li>
+<li><p>确保子进程创建后当前用户拥有的进程数目没有超出分配资源的限制后，将子进程描述符内大部分成员变量置0，以将父进程区分开来。</p>
+</li>
+<li><p>子进程状态设置为TASK_UNINTERRUPTIBLE</p>
+</li>
+<li><p>调用copy_flags()以更新子进程task_struct的flags成员</p>
+</li>
+<li><p>根据clone flag，拷贝或共享打开的文件，文件系统及信息，进程地址空间等</p>
+</li>
+<li><p>返回一个指向子进程描述符的指针</p>
+</li>
+</ul>
+</blockquote>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr, pid)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">	p = dup_task_struct(current);</span><br><span class="line">	<span class="comment">//...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果进程描述符的地址小于（unsigned long）MAX_ERRNO–4095，则做下段代码片以后的工作，否则，将PID置为空闲，并将越界的地址赋给pid字段：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (!IS_ERR(p))&#123;...&#125;</span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">		free_pidmap(pid);</span><br><span class="line">		pid = PTR_ERR(p);</span><br><span class="line">&#125; <span class="comment">// &lt;&lt; end if !IS_ERR(p) &gt;&gt;</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果设置了CLONE_VFORK，表示这是在使用vfork()系统调用，将vfork字段中的done置0，并调用init_waitqueue_head(),初始化list_head链表：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (clone_flags &amp; CLONE_VFORK) &#123;</span><br><span class="line">			p-&gt;vfork_done = &amp;vfork;</span><br><span class="line">			init_completion(&amp;vfork);</span><br><span class="line">		&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果设置了CLONE_STOPPED,或必须跟踪子进程（PT_PTRACED==1），就设置子进程为TASK_STOPPED状态,并发送SIGSTOP信号挂起它：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> ((p-&gt;ptrace &amp; PT_PTRACED) || (clone_flags &amp; CLONE_STOPPED)) &#123;</span><br><span class="line">			<span class="comment">/*</span></span><br><span class="line"><span class="comment">			 * We'll start up with an immediate SIGSTOP.</span></span><br><span class="line"><span class="comment">			 */</span></span><br><span class="line">			sigaddset(&amp;p-&gt;pending.signal, SIGSTOP);</span><br><span class="line">			set_tsk_thread_flag(p, TIF_SIGPENDING);</span><br><span class="line">		&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果没有设置CLONE_STOPPED，调用wake_up_new_task函数(其作用是：调整父进程和子进程的调度参数，若父、子运行在同一个CPU上,并且不能共享同一组页表(CLONE_VM==0)，把子进程插入父进程运行队列，如果运行在不同的CPU上，或父子进程共享同一组页表，就把子进程插入父进程运行队列的队尾)：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (!(clone_flags &amp; CLONE_STOPPED))</span><br><span class="line">			wake_up_new_task(p, clone_flags);</span><br><span class="line">		<span class="keyword">else</span> <span class="comment">// 如果CLONE_STOPPED标志被设置，就把子进程设置为TASK_STOPPED状态</span></span><br><span class="line">			p-&gt;state = TASK_STOPPED;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果（父）进程正被跟踪，则把子进程的PID插入到父进程的ptrace_message字段，并调用ptrace_notify（ptrace_notify使当前进程停止运行，并向当前进程的父进程发送SIGCHLD信号。子进程的祖父进程是跟踪父进程的debugger进程。dubugger进程可以通过ptrace_message获得被创建子进程的PID）：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (unlikely (trace)) &#123;</span><br><span class="line">			current-&gt;ptrace_message = pid;</span><br><span class="line">			ptrace_notify ((trace &lt;&lt; <span class="number">8</span>) | SIGTRAP);</span><br><span class="line">		&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>如果设置了CLONE_VFORK,就把父进程插入等待队列，并挂起父进程直到子进程结束或者执行了新的程序：</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (clone_flags &amp; CLONE_VFORK) &#123;</span><br><span class="line">			wait_for_completion(&amp;vfork);</span><br><span class="line">			<span class="keyword">if</span> (unlikely (current-&gt;ptrace &amp; PT_TRACE_VFORK_DONE))</span><br><span class="line">				ptrace_notify ((PTRACE_EVENT_VFORK_DONE &lt;&lt; <span class="number">8</span>) | SIGTRAP);</span><br><span class="line">		&#125;</span><br><span class="line"><span class="comment">// &lt;&lt; end if !IS_ERR(p) &gt;&gt; if !IS_ERR(p)语句执行完毕，退出判断</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>返回子进程的pid，do_fork()函数执行完毕。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">return</span> pid;</span><br></pre></td></tr></table></figure>
+<h3 id="参考文献"><a href="#参考文献" class="headerlink" title="参考文献"></a>参考文献</h3><p><a href="https://www.kernel.org/pub/linux/kernel/v2.6/" target="_blank" rel="noopener">(linux官方内核源码)https://www.kernel.org/pub/linux/kernel/v2.6/</a></p>
+<p><strong><em>正文结束，如需转载，请标明出处！</em></strong></p>
+<hr>
+
+        </section>
+    </article>
+    
+    
+        <!-- livere 评论框 start -->
+        <div class="comment">
+            <div id="lv-container" data-id="city" data-uid="MTAyMC8zMzgyNi8xMDM3OQ=="></div>
+        </div>
+        <!-- livere 评论框 end -->
+    
+  </div>
+  <aside>
+    
+    <div class="toc-container">
+        <h1>目录</h1>
+        <div class="content">
+            <ol class="toc"><li class="toc-item toc-level-3"><a class="toc-link" href="#Linux内核版本"><span class="toc-number">1.</span> <span class="toc-text">Linux内核版本</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#do-fork函数概括"><span class="toc-number">2.</span> <span class="toc-text">do_fork函数概括</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#执行过程"><span class="toc-number">3.</span> <span class="toc-text">执行过程</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#参考文献"><span class="toc-number">4.</span> <span class="toc-text">参考文献</span></a></li></ol>
+        </div>
+    </div>
+    
+  </aside>
+</main>
+
+
+<script type="text/javascript">
+  (function(d, s) {
+      var j, e = d.getElementsByTagName(s)[0];
+
+      if (typeof LivereTower === 'function') { return; }
+
+      j = d.createElement(s);
+      j.src = 'https://cdn-city.livere.com/js/embed.dist.js';
+      j.async = true;
+
+      e.parentNode.insertBefore(j, e);
+  })(document, 'script');
+</script>
+
+
+  <footer>
+  <div class="copyright">
+    <div>
+      &copy; 2018 | Xiaoru Zhu<!--Powered by <a href="https://hexo.io" target="_blank">Hexo</a>-->&nbsp
+    </div>
+    <!--
+    <div>
+      Theme by <a href="https://github.com/lewis-geek/hexo-theme-Aath" target="_blank">Aath</a>
+    </div>
+    -->
+  </div>
+</footer>
+
+
+<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+<script src="/lib/in-view.min.js"></script>
+<script src="/lib/lodash.min.js"></script>
+<script>
+  var isDown = true
+  var oldY = 0
+  inView.offset(50)
+
+  document.body.addEventListener('touchstart', function(){});
+
+  window.addEventListener('scroll', _.throttle(e => {
+    var currentY = window.scrollY
+    if((oldY - currentY) < 0) {
+      isDown = true
+    } else {
+      isDown = false
+    }
+    oldY = currentY
+  }, 250))
+
+  $("article img").each(function() {
+      var strA = "<a data-fancybox='gallery' href='" + this.src + "'></a>";
+      $(this).wrapAll(strA);
+  });
+
+  $('.toc-link').each(function() {
+      var href = $(this).attr("href");
+
+      inView(href).on('exit', () => {
+        if (isDown) {
+          handleActive(href)
+        }
+      })
+
+      inView(href).on('enter', () => {
+        if (!isDown) {
+          handleActive(href)
+        }
+      })
+
+      this.onclick = function(e) {
+        var pos = $(href).offset().top - 10;
+        $("html,body").animate({scrollTop: pos}, 300);
+        setTimeout(() => {
+          handleActive(href)
+        }, 350)
+        return false
+      }
+  })
+
+  function handleActive(href) {
+    document.querySelectorAll('.toc-link').forEach(elm => {
+      elm.classList.remove('active')
+    })
+    document.querySelector(".toc [href='"+ href +"']").classList.add('active')
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.1.20/jquery.fancybox.min.js"></script>
+
+
+</body>
+</html>
